@@ -1,0 +1,7 @@
+node_modules
+package-lock.json
+yarn.json
+npm-debug.log
+yarn-lock.log
+*.DS_store
+.firebaserc
