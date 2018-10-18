@@ -1,9 +1,9 @@
 {
   "parserOptions": {
-    "ecmaVersion": 7,
+    "ecmaVersion": 2018,
     "sourceType": "script"
   },
-  "extends": ["eslint:recommended", "google"],
+  "extends": ["google"],
   "env": {
     "node": true
   }
