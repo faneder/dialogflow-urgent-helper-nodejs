@@ -19,6 +19,15 @@ const googleMapsClient = maps.createClient({
     Promise: Promise,
 });
 
+const line = require('@line/bot-sdk');
+const lineConfig = {
+    channelAccessToken: config.line.channel_access_token,
+    channelSecret: config.line.channel_secret,
+};
+const lineClient = new line.Client(lineConfig);
+
+const {WebhookClient} = require('dialogflow-fulfillment');
+
 // audio config
 const sounds = {
     alarmClock: 'https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg'
@@ -28,8 +37,10 @@ const sounds = {
  * ask a user for permission
  * @param {object} options
  */
-const askPermission = (conv, options) => {
+const askPermission = (agent, options) => {
+    let conv = agent.conv();
     conv.ask(new Permission(options));
+    agent.add(conv);
 };
 
 /**
@@ -49,7 +60,7 @@ const askAudio = (conv, textToSpeech) => {
 const getPlacesNearby = async (params) => {
     try {
         const response = await googleMapsClient.placesNearby(params).asPromise()
-        const { results, status } = await response.json;
+        const {results, status} = await response.json;
 
         if (status === 'OK') {
             return results[0];
@@ -78,6 +89,23 @@ const getDistanceMatrix = async (params) => {
         throw new Error(`distanceMatrix Failed for the following reason: ${status}`);
     } catch (error) {
         throw new Error(`getDistanceMatrix Fetch Failed: ${error}`);
+    }
+};
+
+/**
+ * push message to line
+ * @param {string} to
+ * @param {array} message
+ * @param {array} location
+ * @return {results<promise>}
+ */
+
+const callContact = async ({ to, message, location }) => {
+    const response = await lineClient.pushMessage(to, message).catch((err) => {
+        throw new Error(`line push message Failed: ${err}`);
+    });
+    if (response) {
+        return await lineClient.pushMessage(to, location);
     }
 };
 

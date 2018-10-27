@@ -17,12 +17,13 @@
     "logs": "firebase functions:log"
   },
   "dependencies": {
+    "@google/maps": "^0.5.5",
+    "@line/bot-sdk": "^6.3.0",
     "actions-on-google": "^2.2.0",
-    "firebase-admin": "^5.13.1",
-    "firebase-functions": "^2.0.2",
     "dialogflow": "^0.6.0",
     "dialogflow-fulfillment": "^0.5.0",
-    "@google/maps": "^0.5.5"
+    "firebase-admin": "^5.13.1",
+    "firebase-functions": "^2.0.2"
   },
   "devDependencies": {
     "eslint": "^4.19.1",
