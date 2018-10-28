@@ -6,9 +6,6 @@ const {
 } = require('actions-on-google');
 const {responses} = require('./responses');
 
-// Instantiate the Dialogflow Client.
-const app = dialogflow({debug: true});
-
 // Import the firebase-functions package for deployment.
 const functions = require('firebase-functions');
 const config = functions.config();
@@ -47,8 +44,8 @@ const askPermission = (agent, options) => {
  * call the audio from responses
  * @param {string} textToSpeech
  */
-const askAudio = (conv, textToSpeech) => {
-    conv.ask(textToSpeech);
+const askAudio = (agent, textToSpeech) => {
+    agent.add(textToSpeech);
 };
 
 /**
@@ -79,7 +76,7 @@ const getPlacesNearby = async (params) => {
  */
 const getDistanceMatrix = async (params) => {
     try {
-        const response = await googleMapsClient.distanceMatrix(params).asPromise()
+        const response = await googleMapsClient.distanceMatrix(params).asPromise();
         const {status, ...results} = await response.json;
 
         if (status === 'OK') {
@@ -109,75 +106,147 @@ const callContact = async ({ to, message, location }) => {
     }
 };
 
-/**
- * Handle the Dialogflow intent named 'Default Welcome Intent'.
- */
-app.intent('Default Welcome Intent', (conv) => {
-    const options = {
-        context: 'In according to help you find the closet hospital in the best way.',
-        // Ask for more than one permission. User can authorize all or none.
-        permissions: ['NAME', 'DEVICE_PRECISE_LOCATION'],
-    };
-    askPermission(conv, options);
-});
+exports.urgentHelper = functions.https.onRequest((request, response) => {
+    console.log(request)
+    const agent = new WebhookClient({request, response});
 
-/**
- * Handle the Dialogflow intent named 'actions_intent_PERMISSION
- * @param {boolean} permissionGranted
- */
-app.intent('actions_intent_PERMISSION', async (conv, params, permissionGranted) => {
-    if (!permissionGranted) {
-        throw new Error('Permission not granted');
+    const line = (agent) => {
+        console.log('lineagent')
+        console.log(agent)
+        agent.add(`Please copy below's id to your google assitant`);
+        let id = request.body.originalDetectIntentRequest.payload.data.source.roomId;
+        agent.add(`Your room id is: ${id}`);
+    };
+
+    const welcome = (agent) => {
+        agent.add(`Welcome to my agent!`);
+
+        const options = {
+            context: 'To give results in your area',
+            permissions: ['NAME', 'DEVICE_PRECISE_LOCATION'],
+        };
+        askPermission(agent, options)
+    };
+
+    /**
+     * Handle the Dialogflow intent named 'actions_intent_PERMISSION
+     * @param {boolean} permissionGranted
+     */
+    // const permission = (conv, params, permissionGranted) => {
+    const actionsIntentPermission = async (agent, params, permissionGranted) => {
+        let conv = agent.conv();
+        const data = conv.request;
+        if (!conv.request.user.permissions) {
+            throw new Error('Permission not granted');
+        }
+        console.log(JSON.stringify(conv, null, 4));
+        console.log(JSON.stringify(data, null, 4));
+        console.log(JSON.stringify(data.user.profile.displayName, null, 4));
+
+
+        const { coordinates } = data.device.location;
+        const inOneHour = Math.round((new Date().getTime() + 60 * 60 * 1000) / 1000);
+        console.error('coordinates')
+        console.error(coordinates)
+        // find the close place
+        const {
+            name: hospitalName,
+            geometry: geometry
+        } = await getPlacesNearby({
+            type: 'hospital',
+            location: coordinates,
+            rankby: 'distance',
+            name: 'hospital',
+            opennow: true
+        }).catch((err) => {
+            throw new Error(err);
+        });
+
+        const {
+            rows,
+            origin_addresses,
+            destination_addresses,
+        } = await getDistanceMatrix({
+            origins: { lat: coordinates.latitude, lng: coordinates.longitude },
+            destinations: geometry.location,
+            departure_time: inOneHour,
+            mode: 'driving',
+            avoid: ['tolls', 'ferries'],
+            traffic_model: 'best_guess'
+        }).catch((err) => {
+            throw new Error(err);
+        });
+
+        const userName = data.user.profile.displayName;
+
+        const emergencyInfo = {
+            alarmClock: sounds.alarmClock,
+            hospitalName: hospitalName,
+            hospitalAddress: destination_addresses[0],
+            userName: userName,
+            userAddress: origin_addresses[0],
+            coordinates: JSON.stringify(coordinates),
+            durationTraffic: rows[0].elements[0].duration_in_traffic.text
+        }
+
+        // notify user's line group with contact info
+        const contact = await callContact({
+            to:'Rd4f5fe350b11d640e1a49dee3c95a2e9',
+            message: {
+                type: 'text',
+                text: responses.contactNotify(emergencyInfo)
+            },
+            location: {
+                type: 'location',
+                title: `${userName}'s Location`,
+                address: origin_addresses[0],
+                ...coordinates,
+            }
+        });
+
+        console.log('contact');
+        console.log(contact);
+        if (contact) {
+            askAudio(agent, responses.emergencyNotify(emergencyInfo));
+        }
+    };
+
+    const storeLine = (agent) => {
+        console.error('storeLine')
+        console.error(agent)
+        agent.context.set({
+            name: 'temperature',
+            lifespan: 1,
+            parameters:{temperature: 'temperature', unit: 'unit'}
+        });
+
+        let conv = agent.conv();
+        console.error(JSON.stringify(conv, null, 4));
+        // conv.request.user.storage.count = 1;
+        // conv.request.user.storage.someProperty = 'someValue'
+        agent.add(conv)
+        console.error('agent')
+        console.error(JSON.stringify(conv, null, 4));
+        agent.add('storeLine sotre')
+    };
+
+    let intentMap = new Map();
+    intentMap.set('Default Welcome Intent', welcome);
+    // intentMap.set('Default Fallback Intent', fallback);
+    intentMap.set('actions_intent_PERMISSION', actionsIntentPermission);
+    intentMap.set('link_line', line);
+    intentMap.set('store_line', storeLine);
+
+    // if requests for intents other than the default welcome and default fallback
+    // is from the Google Assistant use the `googleAssistantOther` function
+    // otherwise use the `other` function
+    if (agent.requestSource === agent.ACTIONS_ON_GOOGLE) {
+        console.error('google')
+        // intentMap.set(null, googleAssistantOther);
+    } else {
+        console.error('other')
+        // intentMap.set(null, other);
     }
 
-    const {coordinates} = conv.device.location;
-    const inOneHour = Math.round((new Date().getTime() + 60 * 60 * 1000) / 1000);
-
-    // find the close place
-    const {
-        name: hospitalName,
-        geometry,
-     } = await getPlacesNearby({
-        type: 'hospital',
-        location: coordinates,
-        rankby: 'distance',
-        name: 'hospital',
-        opennow: true,
-    });
-
-    const {
-        rows,
-        origin_addresses,
-        destination_addresses,
-    } = await getDistanceMatrix({
-        origins: {lat: coordinates.latitude, lng: coordinates.longitude},
-        destinations: geometry.location,
-        departure_time: inOneHour,
-        mode: 'driving',
-        avoid: ['tolls', 'ferries'],
-        traffic_model: 'best_guess',
-    });
-
-    const emergencyInfo = {
-        alarmClock: sounds.alarmClock,
-        hospitalName: hospitalName,
-        hospitalAddress: destination_addresses[0],
-        userName: conv.user.name.display,
-        userAddress: origin_addresses[0],
-        coordinates: JSON.stringify(coordinates),
-        durationTraffic: rows[0].elements[0].duration_in_traffic.text,
-    };
-
-    askAudio(conv, responses.emergencyNotify(emergencyInfo));
+    agent.handleRequest(intentMap);
 });
-
-/**
- * Handle the incoming error
- */
-app.catch((conv, e) => {
-    conv.close(responses.errorNotify);
-    console.error(e);
-});
-
-exports.urgentHelper = functions.https.onRequest(app);
-

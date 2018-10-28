@@ -19,6 +19,19 @@ const responses = {
         </emphasis>
     </speak>
     `,
+    contactNotify: ({
+        userName,
+        userAddress,
+        hospitalName,
+        hospitalAddress,
+        durationTraffic,
+    }) => `
+        Emergency Notification From ${userName}.
+        ${userName} needs your help immediately!
+        ${userName} is at "${userAddress}", the closest hospital is
+        "${hospitalName}" at ${hospitalAddress} where is ${durationTraffic}.
+        The hospital is ${durationTraffic} away to ${userName}'s location.
+    `,
     errorNotify: `
     <speak>
         Oh my god!
