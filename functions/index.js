@@ -5,7 +5,7 @@ const {
   Confirmation,
 } = require('actions-on-google');
 const {
-  responses
+  responses,
 } = require('./responses');
 
 // Import the firebase-functions package for deployment.
