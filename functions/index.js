@@ -1,10 +1,12 @@
 'use strict';
 
 const {
-    dialogflow,
-    Permission,
+  Permission,
+  Confirmation,
 } = require('actions-on-google');
-const {responses} = require('./responses');
+const {
+  responses
+} = require('./responses');
 
 // Import the firebase-functions package for deployment.
 const functions = require('firebase-functions');
@@ -12,22 +14,24 @@ const config = functions.config();
 
 const maps = require('@google/maps');
 const googleMapsClient = maps.createClient({
-    key: config.maps.key,
-    Promise: Promise,
+  key: config.maps.key,
+  Promise: Promise,
 });
 
 const line = require('@line/bot-sdk');
 const lineConfig = {
-    channelAccessToken: config.line.channel_access_token,
-    channelSecret: config.line.channel_secret,
+  channelAccessToken: config.line.channel_access_token,
+  channelSecret: config.line.channel_secret,
 };
 const lineClient = new line.Client(lineConfig);
 
-const {WebhookClient} = require('dialogflow-fulfillment');
+const {
+  WebhookClient,
+} = require('dialogflow-fulfillment');
 
 // audio config
 const sounds = {
-    alarmClock: 'https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg'
+  alarmClock: 'https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg'
 };
 
 /**
@@ -35,9 +39,9 @@ const sounds = {
  * @param {object} options
  */
 const askPermission = (agent, options) => {
-    let conv = agent.conv();
-    conv.ask(new Permission(options));
-    agent.add(conv);
+  let conv = agent.conv();
+  conv.ask(new Permission(options));
+  agent.add(conv);
 };
 
 /**
@@ -45,7 +49,7 @@ const askPermission = (agent, options) => {
  * @param {string} textToSpeech
  */
 const askAudio = (agent, textToSpeech) => {
-    agent.add(textToSpeech);
+  agent.add(textToSpeech);
 };
 
 /**
@@ -55,18 +59,18 @@ const askAudio = (agent, textToSpeech) => {
  * @return {results<object>}
  */
 const getPlacesNearby = async (params) => {
-    try {
-        const response = await googleMapsClient.placesNearby(params).asPromise()
-        const {results, status} = await response.json;
+  try {
+    const response = await googleMapsClient.placesNearby(params).asPromise()
+    const {results, status} = await response.json;
 
-        if (status === 'OK') {
-            return results[0];
-        }
-
-        throw new Error(`getPlacesNearby Failed for the following reason: ${status}`);
-    } catch (error) {
-        throw new Error(`placesNearby Fetch Failed: ${error}`);
+    if (status === 'OK') {
+      return results[0];
     }
+
+    throw new Error(`Failed get places for the following reason: ${status}`);
+  } catch (error) {
+    throw new Error(`Failed Fetch places: ${error}`);
+  }
 };
 
 /**
@@ -75,18 +79,18 @@ const getPlacesNearby = async (params) => {
  * @return {results<object>}
  */
 const getDistanceMatrix = async (params) => {
-    try {
-        const response = await googleMapsClient.distanceMatrix(params).asPromise();
-        const {status, ...results} = await response.json;
+  try {
+    const response = await googleMapsClient.distanceMatrix(params).asPromise();
+    const {status, ...results} = await response.json;
 
-        if (status === 'OK') {
-            return {...results};
-        }
-
-        throw new Error(`distanceMatrix Failed for the following reason: ${status}`);
-    } catch (error) {
-        throw new Error(`getDistanceMatrix Fetch Failed: ${error}`);
+    if (status === 'OK') {
+      return {...results};
     }
+
+    throw new Error(`Failed get distance for the following reason: ${status}`);
+  } catch (error) {
+    throw new Error(`Fetch Failed get distance: ${error}`);
+  }
 };
 
 /**
@@ -97,156 +101,166 @@ const getDistanceMatrix = async (params) => {
  * @return {results<promise>}
  */
 
-const callContact = async ({ to, message, location }) => {
-    const response = await lineClient.pushMessage(to, message).catch((err) => {
-        throw new Error(`line push message Failed: ${err}`);
-    });
+const callContact = async ({to, message, location}) => {
+  try {
+    const response = await lineClient.pushMessage(to, message);
+
     if (response) {
-        return await lineClient.pushMessage(to, location);
+      return await lineClient.pushMessage(to, location);
     }
+  } catch (error) {
+    throw new Error(`line push message Failed: ${error}`);
+  }
+};
+
+const hasRoomId = (conv) => {
+  return !!conv.user.storage.roomId;
+};
+
+const getRoomId = (conv) => {
+  return conv.user.storage.roomId;
+};
+
+const sendNotify = async (agent) => {
+  const conv = agent.conv();
+  const {coordinates} = conv.request.device.location;
+  const inOneHour = Math.round((new Date().getTime() + 60 * 60 * 1000) / 1000);
+
+  // find the closet hospital
+  const {
+    name: hospitalName,
+    geometry: geometry,
+  } = await getPlacesNearby({
+    type: 'hospital',
+    location: coordinates,
+    rankby: 'distance',
+    name: 'hospital',
+    opennow: true,
+  });
+
+  // get the distance from user's location to the closet hospital
+  const {
+    rows,
+    origin_addresses,
+    destination_addresses,
+  } = await getDistanceMatrix({
+    origins: {
+      lat: coordinates.latitude,
+      lng: coordinates.longitude,
+    },
+    destinations: geometry.location,
+    departure_time: inOneHour,
+    mode: 'driving',
+    avoid: ['tolls', 'ferries'],
+    traffic_model: 'best_guess',
+  });
+
+  const userName = conv.request.user.profile.displayName;
+  const emergencyInfo = {
+    alarmClock: sounds.alarmClock,
+    hospitalName: hospitalName,
+    hospitalAddress: destination_addresses[0],
+    userName: userName,
+    userAddress: origin_addresses[0],
+    coordinates: JSON.stringify(coordinates),
+    durationTraffic: rows[0].elements[0].duration_in_traffic.text,
+  };
+
+  // notify to user's line group
+  const contact = await callContact({
+    to: getRoomId(conv),
+    message: {
+      type: 'text',
+      text: responses.contactNotify(emergencyInfo)
+    },
+    location: {
+      type: 'location',
+      title: `${userName}'s Location`,
+      address: origin_addresses[0],
+      ...coordinates,
+    },
+  });
+
+  if (contact) {
+    askAudio(agent, responses.emergencyNotify(emergencyInfo));
+  }
 };
 
 exports.urgentHelper = functions.https.onRequest((request, response) => {
-    console.log(request)
-    const agent = new WebhookClient({request, response});
+  const agent = new WebhookClient({request, response});
 
-    const line = (agent) => {
-        console.log('lineagent')
-        console.log(agent)
-        agent.add(`Please copy below's id to your google assitant`);
-        let id = request.body.originalDetectIntentRequest.payload.data.source.roomId;
-        agent.add(`Your room id is: ${id}`);
-    };
+  const lineInfo = (agent) => {
+    agent.add(`Please copy below's room id to your google assistant`);
+    const id = request.body.originalDetectIntentRequest.payload.data.source.roomId;
+    agent.add(`${id}`);
+  };
 
-    const welcome = (agent) => {
-        agent.add(`Welcome to my agent!`);
+  const welcome = (agent) => {
+    const conv = agent.conv();
 
-        const options = {
-            context: 'To give results in your area',
-            permissions: ['NAME', 'DEVICE_PRECISE_LOCATION'],
-        };
-        askPermission(agent, options)
-    };
-
-    /**
-     * Handle the Dialogflow intent named 'actions_intent_PERMISSION
-     * @param {boolean} permissionGranted
-     */
-    // const permission = (conv, params, permissionGranted) => {
-    const actionsIntentPermission = async (agent, params, permissionGranted) => {
-        let conv = agent.conv();
-        const data = conv.request;
-        if (!conv.request.user.permissions) {
-            throw new Error('Permission not granted');
-        }
-        console.log(JSON.stringify(conv, null, 4));
-        console.log(JSON.stringify(data, null, 4));
-        console.log(JSON.stringify(data.user.profile.displayName, null, 4));
-
-
-        const { coordinates } = data.device.location;
-        const inOneHour = Math.round((new Date().getTime() + 60 * 60 * 1000) / 1000);
-        console.error('coordinates')
-        console.error(coordinates)
-        // find the close place
-        const {
-            name: hospitalName,
-            geometry: geometry
-        } = await getPlacesNearby({
-            type: 'hospital',
-            location: coordinates,
-            rankby: 'distance',
-            name: 'hospital',
-            opennow: true
-        }).catch((err) => {
-            throw new Error(err);
-        });
-
-        const {
-            rows,
-            origin_addresses,
-            destination_addresses,
-        } = await getDistanceMatrix({
-            origins: { lat: coordinates.latitude, lng: coordinates.longitude },
-            destinations: geometry.location,
-            departure_time: inOneHour,
-            mode: 'driving',
-            avoid: ['tolls', 'ferries'],
-            traffic_model: 'best_guess'
-        }).catch((err) => {
-            throw new Error(err);
-        });
-
-        const userName = data.user.profile.displayName;
-
-        const emergencyInfo = {
-            alarmClock: sounds.alarmClock,
-            hospitalName: hospitalName,
-            hospitalAddress: destination_addresses[0],
-            userName: userName,
-            userAddress: origin_addresses[0],
-            coordinates: JSON.stringify(coordinates),
-            durationTraffic: rows[0].elements[0].duration_in_traffic.text
-        }
-
-        // notify user's line group with contact info
-        const contact = await callContact({
-            to:'Rd4f5fe350b11d640e1a49dee3c95a2e9',
-            message: {
-                type: 'text',
-                text: responses.contactNotify(emergencyInfo)
-            },
-            location: {
-                type: 'location',
-                title: `${userName}'s Location`,
-                address: origin_addresses[0],
-                ...coordinates,
-            }
-        });
-
-        console.log('contact');
-        console.log(contact);
-        if (contact) {
-            askAudio(agent, responses.emergencyNotify(emergencyInfo));
-        }
-    };
-
-    const storeLine = (agent) => {
-        console.error('storeLine')
-        console.error(agent)
-        agent.context.set({
-            name: 'temperature',
-            lifespan: 1,
-            parameters:{temperature: 'temperature', unit: 'unit'}
-        });
-
-        let conv = agent.conv();
-        console.error(JSON.stringify(conv, null, 4));
-        // conv.request.user.storage.count = 1;
-        // conv.request.user.storage.someProperty = 'someValue'
-        agent.add(conv)
-        console.error('agent')
-        console.error(JSON.stringify(conv, null, 4));
-        agent.add('storeLine sotre')
-    };
-
-    let intentMap = new Map();
-    intentMap.set('Default Welcome Intent', welcome);
-    // intentMap.set('Default Fallback Intent', fallback);
-    intentMap.set('actions_intent_PERMISSION', actionsIntentPermission);
-    intentMap.set('link_line', line);
-    intentMap.set('store_line', storeLine);
-
-    // if requests for intents other than the default welcome and default fallback
-    // is from the Google Assistant use the `googleAssistantOther` function
-    // otherwise use the `other` function
-    if (agent.requestSource === agent.ACTIONS_ON_GOOGLE) {
-        console.error('google')
-        // intentMap.set(null, googleAssistantOther);
+    if (hasRoomId(conv)) {
+      const options = {
+        context: 'To give results in your area',
+        permissions: ['NAME', 'DEVICE_PRECISE_LOCATION'],
+      };
+      askPermission(agent, options);
     } else {
-        console.error('other')
-        // intentMap.set(null, other);
+      agent.add(`Please calling "store line" to save your room id from line`);
+    }
+  };
+
+  /**
+   * Handle the Dialogflow intent named 'actions_intent_PERMISSION
+   * @param {object} agent
+   * @return {results}
+   */
+  const actionsIntentPermission = (agent) => {
+    const conv = agent.conv();
+
+    if (!conv.request.user.permissions) {
+      throw new Error('Permission not granted');
     }
 
-    agent.handleRequest(intentMap);
+    return sendNotify(agent);
+  };
+
+  const storeLine = async (agent) => {
+    const conv = agent.conv();
+    const roomId = agent.parameters.room_id[0];
+
+    if (roomId) {
+      try {
+        const response = await lineClient.pushMessage(roomId, {
+          type: 'text',
+          text: 'success link to google assistant',
+        });
+
+        if (response) {
+          conv.user.storage.roomId = roomId;
+          conv.ask(new Confirmation(`Your room id is: ${roomId}, Can you confirm?`));
+        }
+      } catch (error) {
+        conv.close(`Please check you entered the room id from line correctly`);
+        console.error(`store line error ${error}`);
+      }
+
+      agent.add(conv);
+    };
+  };
+
+  let intentMap = new Map();
+
+  switch (agent.requestSource) {
+    case 'LINE':
+      intentMap.set('line_info', lineInfo);
+      break;
+    default:
+      console.error('other agent.requestSource')
+      intentMap.set('Default Welcome Intent', welcome);
+      intentMap.set('actions_intent_PERMISSION', actionsIntentPermission);
+      intentMap.set('store_line', storeLine);
+      break;
+  }
+
+  agent.handleRequest(intentMap);
 });
