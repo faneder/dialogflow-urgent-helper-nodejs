@@ -205,7 +205,9 @@ exports.urgentHelper = functions.https.onRequest((request, response) => {
       };
       askPermission(agent, options);
     } else {
-      agent.add(`Please calling "store line" to save your room id from line`);
+      agent.add(`following below's steps for setting up your chat room with google assistant`);
+      agent.add(`1. go to LINE App and call "get room id" to get your room id`);
+      agent.add(`2. call "store line" at google assistant and enter your room id`);
     }
   };
 
@@ -255,7 +257,6 @@ exports.urgentHelper = functions.https.onRequest((request, response) => {
       intentMap.set('line_info', lineInfo);
       break;
     default:
-      console.error('other agent.requestSource')
       intentMap.set('Default Welcome Intent', welcome);
       intentMap.set('actions_intent_PERMISSION', actionsIntentPermission);
       intentMap.set('store_line', storeLine);
