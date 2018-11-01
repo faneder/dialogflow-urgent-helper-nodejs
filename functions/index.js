@@ -3,6 +3,7 @@
 const {
   Permission,
   Confirmation,
+  SimpleResponse,
 } = require('actions-on-google');
 const {
   responses,
@@ -205,9 +206,16 @@ exports.urgentHelper = functions.https.onRequest((request, response) => {
       };
       askPermission(agent, options);
     } else {
-      agent.add(`following below's steps for setting up your chat room with google assistant`);
-      agent.add(`1. go to LINE App and call "get room id" to get your room id`);
-      agent.add(`2. call "store line" at google assistant and enter your room id`);
+      conv.ask(`following below's steps for setting up your chat room with google assistant`);
+      conv.ask(new SimpleResponse({
+        text: `1. go to LINE App and enter "get room id" to get your room id \n
+        2. call "store line" at google assistant and enter your room id \n
+        3. you will receive a notification from line when you set up correctly`,
+        speech: `First, go to LINE App and enter "get room id" to get your room id. \
+        Second, call "store line" at google assistant and enter your room id \
+        Finally, you will receive a notification from line when you set up correctly.`,
+      }));
+      agent.add(conv);
     }
   };
 
