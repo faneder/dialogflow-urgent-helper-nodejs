@@ -36,8 +36,9 @@ const sounds = {
   alarmClock: 'https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg'
 };
 
-const images = {
-  lineQrCode: 'https://firebasestorage.googleapis.com/v0/b/urgent-helper.appspot.com/o/line%2Fline_qrcode.png?alt=media&token=911314bd-1e90-4426-b967-d4e6092afd3c'
+const lineUrgentHelper = {
+  QrCode: 'https://firebasestorage.googleapis.com/v0/b/urgent-helper.appspot.com/o/line%2Fline_qrcode.png?alt=media&token=911314bd-1e90-4426-b967-d4e6092afd3c',
+  buttonUrl: 'https://line.me/R/ti/p/%40jcx3672s',
 };
 
 /**
@@ -211,11 +212,15 @@ exports.urgentHelper = functions.https.onRequest((request, response) => {
       };
       askPermission(agent, options);
     } else {
-      agent.add(new Card(responses.addLine(images.lineQrCode)));
+      agent.add(new Card(responses.addLineCard({...lineUrgentHelper})));
       agent.add(new Suggestion('Next'));
     }
   };
 
+  /**
+   * handler to add text and card responses
+   * @param {Object} agent
+  */
   const WelcomeIntentNext = (agent) => {
     agent.add(responses.setLineSteps);
     agent.add(new Suggestion('store line'));
