@@ -42,7 +42,8 @@ const lineUrgentHelper = {
 };
 
 /**
- * ask a user for permission
+ * Ask a user for permission
+ * @param {object} agent
  * @param {object} options
  */
 const askPermission = (agent, options) => {
@@ -52,7 +53,8 @@ const askPermission = (agent, options) => {
 };
 
 /**
- * call the audio from responses
+ * Call the audio from responses
+ * @param {object} agent
  * @param {string} textToSpeech
  */
 const askAudio = (agent, textToSpeech) => {
@@ -60,7 +62,7 @@ const askAudio = (agent, textToSpeech) => {
 };
 
 /**
- * Gets the closet places from user's coordinates.
+ * Get the closet places from user's coordinates.
  * @param {object} params
  * @return {promise}
  * @return {results<object>}
@@ -81,7 +83,7 @@ const getPlacesNearby = async (params) => {
 };
 
 /**
- * Gets the distance from origin address to destination addresses
+ * Get the distance from origin address to destination addresses
  * @param {object} params
  * @return {results<object>}
  */
@@ -101,7 +103,7 @@ const getDistanceMatrix = async (params) => {
 };
 
 /**
- * push message to line
+ * Push message to line
  * @param {string} to
  * @param {array} message
  * @param {array} location
@@ -120,14 +122,28 @@ const callContact = async ({to, message, location}) => {
   }
 };
 
+/**
+ * Check if has a roomId
+ * @param {Object} conv
+ * @return {boolean}
+ */
 const hasRoomId = (conv) => {
   return !!conv.user.storage.roomId;
 };
 
+/**
+ * Get line room id
+ * @param {Object} conv
+ * @return {string} roomId
+ */
 const getRoomId = (conv) => {
   return conv.user.storage.roomId;
 };
 
+/**
+ * Send notifications to line contacts
+ * @param {Object} agent
+ */
 const sendNotify = async (agent) => {
   const conv = agent.conv();
   const {coordinates} = conv.request.device.location;
@@ -196,12 +212,20 @@ const sendNotify = async (agent) => {
 exports.urgentHelper = functions.https.onRequest((request, response) => {
   const agent = new WebhookClient({request, response});
 
+  /**
+   * Handle intent named 'line_info'
+   * @param {Object} agent
+   */
   const lineInfo = (agent) => {
     agent.add(`Please copy below's room id to your google assistant`);
     const id = request.body.originalDetectIntentRequest.payload.data.source.roomId;
     agent.add(`${id}`);
   };
 
+  /**
+   * Handle intent named 'default welcome intent'
+   * @param {Object} agent
+   */
   const welcome = (agent) => {
     const conv = agent.conv();
 
@@ -218,16 +242,16 @@ exports.urgentHelper = functions.https.onRequest((request, response) => {
   };
 
   /**
-   * handler to add text and card responses
+   * Handle intent named 'default welcome intent - next'
    * @param {Object} agent
-  */
+   */
   const WelcomeIntentNext = (agent) => {
     agent.add(responses.setLineSteps);
     agent.add(new Suggestion('store line'));
   };
 
   /**
-   * Handle the Dialogflow intent named 'actions_intent_PERMISSION
+   * Handle the Dialogflow intent named 'actions_intent_PERMISSION'
    * @param {object} agent
    * @return {results}
    */
@@ -241,6 +265,10 @@ exports.urgentHelper = functions.https.onRequest((request, response) => {
     return sendNotify(agent);
   };
 
+  /**
+   * Handle the intent named 'storeLine'
+   * @param {object} agent
+   */
   const storeLine = async (agent) => {
     const conv = agent.conv();
     const roomId = agent.parameters.room_id[0];
