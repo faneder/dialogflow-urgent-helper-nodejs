@@ -209,6 +209,21 @@ const sendNotify = async (agent) => {
   }
 };
 
+const getGroupChatId = (source) => {
+  let id = null;
+
+  switch (source.type) {
+    case 'room':
+      id = source.roomId;
+      break;
+    case 'group':
+      id = source.groupId;
+      break;
+  }
+
+  return id;
+};
+
 exports.urgentHelper = functions.https.onRequest((request, response) => {
   const agent = new WebhookClient({request, response});
 
@@ -217,9 +232,9 @@ exports.urgentHelper = functions.https.onRequest((request, response) => {
    * @param {Object} agent
    */
   const lineInfo = (agent) => {
-    agent.add(`Please copy below's room id to your google assistant`);
-    const id = request.body.originalDetectIntentRequest.payload.data.source.roomId;
-    agent.add(`${id}`);
+    const {source} = request.body.originalDetectIntentRequest.payload.data;
+    const chatId = getGroupChatId(source);
+    agent.add(`${chatId}`);
   };
 
   /**
