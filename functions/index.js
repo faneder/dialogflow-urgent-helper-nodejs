@@ -37,7 +37,7 @@ const sounds = {
 };
 
 const lineUrgentHelper = {
-  QrCode: 'https://firebasestorage.googleapis.com/v0/b/urgent-helper.appspot.com/o/line%2Fline_qrcode.png?alt=media&token=911314bd-1e90-4426-b967-d4e6092afd3c',
+  imageUrl: 'https://firebasestorage.googleapis.com/v0/b/urgent-helper.appspot.com/o/line%2Fline_qrcode.png?alt=media&token=911314bd-1e90-4426-b967-d4e6092afd3c',
   buttonUrl: 'https://line.me/R/ti/p/%40jcx3672s',
 };
 

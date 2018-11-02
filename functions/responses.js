@@ -32,6 +32,19 @@ const responses = {
         "${hospitalName}" at ${hospitalAddress} where is ${durationTraffic}.
         The hospital is ${durationTraffic} away to ${userName}'s location.
     `,
+    addLineCard: ({imageUrl, buttonUrl}) => ({
+        title: `Setup your QrCode in Line APP of Urgent Helper`,
+        text: `Please add it and create a room with your urgent contacts then \n
+        type "get room id" in your chat room💁`,
+        buttonText: 'Add Urgent Helper',
+        imageUrl,
+        buttonUrl,
+    }),
+    setLineSteps: `
+        Following below's steps for setting up your line with google assistant \n
+        Calling "store line" at google assistant and enter your room id \n
+        then you will receive a notification from line when you set it up correctly
+    `,
     errorNotify: `
     <speak>
         Oh my god!
