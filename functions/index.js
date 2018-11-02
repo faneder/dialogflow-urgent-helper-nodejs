@@ -3,7 +3,6 @@
 const {
   Permission,
   Confirmation,
-  SimpleResponse,
 } = require('actions-on-google');
 const {
   responses,
@@ -28,11 +27,17 @@ const lineClient = new line.Client(lineConfig);
 
 const {
   WebhookClient,
+  Card,
+  Suggestion,
 } = require('dialogflow-fulfillment');
 
 // audio config
 const sounds = {
   alarmClock: 'https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg'
+};
+
+const images = {
+  lineQrCode: 'https://firebasestorage.googleapis.com/v0/b/urgent-helper.appspot.com/o/line%2Fline_qrcode.png?alt=media&token=911314bd-1e90-4426-b967-d4e6092afd3c'
 };
 
 /**
@@ -206,17 +211,14 @@ exports.urgentHelper = functions.https.onRequest((request, response) => {
       };
       askPermission(agent, options);
     } else {
-      conv.ask(`following below's steps for setting up your chat room with google assistant`);
-      conv.ask(new SimpleResponse({
-        text: `1. go to LINE App and enter "get room id" to get your room id \n
-        2. call "store line" at google assistant and enter your room id \n
-        3. you will receive a notification from line when you set up correctly`,
-        speech: `First, go to LINE App and enter "get room id" to get your room id. \
-        Second, call "store line" at google assistant and enter your room id \
-        Finally, you will receive a notification from line when you set up correctly.`,
-      }));
-      agent.add(conv);
+      agent.add(new Card(responses.addLine(images.lineQrCode)));
+      agent.add(new Suggestion('Next'));
     }
+  };
+
+  const WelcomeIntentNext = (agent) => {
+    agent.add(responses.setLineSteps);
+    agent.add(new Suggestion('store line'));
   };
 
   /**
@@ -250,7 +252,7 @@ exports.urgentHelper = functions.https.onRequest((request, response) => {
           conv.ask(new Confirmation(`Your room id is: ${roomId}, Can you confirm?`));
         }
       } catch (error) {
-        conv.close(`Please check you entered the room id from line correctly`);
+        conv.ask(`Please check you entered the correct room id from line`);
         console.error(`store line error ${error}`);
       }
 
@@ -265,10 +267,11 @@ exports.urgentHelper = functions.https.onRequest((request, response) => {
       intentMap.set('line_info', lineInfo);
       break;
     default:
-      intentMap.set('Default Welcome Intent', welcome);
-      intentMap.set('actions_intent_PERMISSION', actionsIntentPermission);
       intentMap.set('store_line', storeLine);
-      break;
+      intentMap.set('Default Welcome Intent', welcome);
+      intentMap.set('Default Welcome Intent - next', WelcomeIntentNext);
+      intentMap.set('actions_intent_PERMISSION', actionsIntentPermission);
+    break;
   }
 
   agent.handleRequest(intentMap);
