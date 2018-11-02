@@ -225,20 +225,31 @@ exports.urgentHelper = functions.https.onRequest((request, response) => {
   /**
    * Handle intent named 'default welcome intent'
    * @param {Object} agent
+   * @return {results}
    */
   const welcome = (agent) => {
     const conv = agent.conv();
+    agent.add('Welcome to urgent helper, how can I help you?');
 
     if (hasRoomId(conv)) {
-      const options = {
-        context: 'To give results in your area',
-        permissions: ['NAME', 'DEVICE_PRECISE_LOCATION'],
-      };
-      askPermission(agent, options);
-    } else {
-      agent.add(new Card(responses.addLineCard({...lineUrgentHelper})));
-      agent.add(new Suggestion('Next'));
+      return agent.add(new Suggestion('help'));
     }
+
+    agent.add(new Card(responses.addLineCard({...lineUrgentHelper})));
+    agent.add(new Suggestion('Next'));
+  };
+
+
+  /**
+   * Handle the intent named 'call_help'
+   * @param {object} agent
+   */
+  const callHelp = (agent) => {
+    const options = {
+      context: 'To give results in your area',
+      permissions: ['NAME', 'DEVICE_PRECISE_LOCATION'],
+    };
+    askPermission(agent, options);
   };
 
   /**
@@ -281,16 +292,24 @@ exports.urgentHelper = functions.https.onRequest((request, response) => {
         });
 
         if (response) {
-          conv.user.storage.roomId = roomId;
           conv.ask(new Confirmation(`Your room id is: ${roomId}, Can you confirm?`));
         }
       } catch (error) {
         conv.ask(`Please check you entered the correct room id from line`);
+        conv.ask(new Suggestion('store line'));
+        conv.ask(new Suggestion('cancel'));
         console.error(`store line error ${error}`);
       }
 
       agent.add(conv);
+      agent.add(new Suggestion('Yes'));
     };
+  };
+
+  const storeLineYes = async (agent) => {
+    const conv = agent.conv();
+    const roomId = agent.context.get('room_id').parameters.room_id[0];
+    conv.user.storage.roomId = roomId;
   };
 
   let intentMap = new Map();
@@ -303,6 +322,8 @@ exports.urgentHelper = functions.https.onRequest((request, response) => {
       intentMap.set('store_line', storeLine);
       intentMap.set('Default Welcome Intent', welcome);
       intentMap.set('Default Welcome Intent - next', WelcomeIntentNext);
+      intentMap.set('store_line - yes', storeLineYes);
+      intentMap.set('call_help', callHelp);
       intentMap.set('actions_intent_PERMISSION', actionsIntentPermission);
     break;
   }
