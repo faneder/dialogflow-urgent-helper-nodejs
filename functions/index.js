@@ -303,7 +303,7 @@ exports.urgentHelper = functions.https.onRequest((request, response) => {
       try {
         const response = await lineClient.pushMessage(roomId, {
           type: 'text',
-          text: 'success link to google assistant',
+          text: 'Trying to link with google assistant',
         });
 
         if (response) {
@@ -322,6 +322,7 @@ exports.urgentHelper = functions.https.onRequest((request, response) => {
   };
 
   const storeLineConfirmation = async (agent) => {
+    const conv = agent.conv();
     const roomId = agent.context.get('room_id').parameters.room_id[0];
     const confirmation = agent.context.get('actions_intent_confirmation').parameters.CONFIRMATION;
 
