@@ -316,15 +316,22 @@ exports.urgentHelper = functions.https.onRequest((request, response) => {
         console.error(`store line error ${error}`);
       }
 
-      agent.add(conv);
       agent.add(new Suggestion('Yes'));
+      agent.add(conv);
     };
   };
 
-  const storeLineYes = async (agent) => {
-    const conv = agent.conv();
+  const storeLineConfirmation = async (agent) => {
     const roomId = agent.context.get('room_id').parameters.room_id[0];
-    conv.user.storage.roomId = roomId;
+    const confirmation = agent.context.get('actions_intent_confirmation').parameters.CONFIRMATION;
+
+    if (confirmation) {
+      conv.user.storage.roomId = roomId;
+      agent.add(`Google assistant has linked your line's room id. You can send your
+      urgent information to your contact when you need.`);
+    } else {
+      agent.add('You need say yes for using Urgent Helper.');
+    }
   };
 
   let intentMap = new Map();
@@ -335,9 +342,9 @@ exports.urgentHelper = functions.https.onRequest((request, response) => {
       break;
     default:
       intentMap.set('store_line', storeLine);
+      intentMap.set('store_line_confirmation', storeLineConfirmation);
       intentMap.set('Default Welcome Intent', welcome);
       intentMap.set('Default Welcome Intent - next', WelcomeIntentNext);
-      intentMap.set('store_line - yes', storeLineYes);
       intentMap.set('call_help', callHelp);
       intentMap.set('actions_intent_PERMISSION', actionsIntentPermission);
     break;
