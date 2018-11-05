@@ -47,7 +47,7 @@ const lineUrgentHelper = {
  * @param {object} options
  */
 const askPermission = (agent, options) => {
-  let conv = agent.conv();
+  const conv = agent.conv();
   conv.ask(new Permission(options));
   agent.add(conv);
 };
@@ -244,14 +244,15 @@ exports.urgentHelper = functions.https.onRequest((request, response) => {
    */
   const welcome = (agent) => {
     const conv = agent.conv();
-    agent.add('Welcome to urgent helper, how can I help you?');
 
     if (hasRoomId(conv)) {
+      agent.add('Welcome to urgent helper, how can I help you?');
       return agent.add(new Suggestion('help'));
     }
 
+    agent.add('Welcome to urgent helper! If you use urgent helper first time, please set up you contacts with google assistant?');
     agent.add(new Card(responses.addLineCard({...lineUrgentHelper})));
-    agent.add(new Suggestion('Next'));
+    agent.add(new Suggestion('go forward'));
   };
 
 
@@ -321,7 +322,7 @@ exports.urgentHelper = functions.https.onRequest((request, response) => {
     };
   };
 
-  const storeLineConfirmation = async (agent) => {
+  const storeLineConfirmation = (agent) => {
     const conv = agent.conv();
     const roomId = agent.context.get('room_id').parameters.room_id[0];
     const confirmation = agent.context.get('actions_intent_confirmation').parameters.CONFIRMATION;
