@@ -224,6 +224,13 @@ const getGroupChatId = (source) => {
   return id;
 };
 
+const verifyChatId = (id) => {
+  let groupPattern = /C[0-9a-f]{32}/
+  let chatPattern = /R[0-9a-f]{32}/
+
+  return (id.match(groupPattern) !== null || id.match(chatPattern) !== null) || false
+};
+
 exports.urgentHelper = functions.https.onRequest((request, response) => {
   const agent = new WebhookClient({request, response});
 
@@ -301,6 +308,10 @@ exports.urgentHelper = functions.https.onRequest((request, response) => {
     const roomId = agent.parameters.room_id[0];
 
     if (roomId) {
+      if (!verifyChatId(roomId)) {
+        return agent.add('Your id is invalidate, please check it again.');
+      }
+
       try {
         const response = await lineClient.pushMessage(roomId, {
           type: 'text',
@@ -308,6 +319,7 @@ exports.urgentHelper = functions.https.onRequest((request, response) => {
         });
 
         if (response) {
+          conv.data.roomId = agent.parameters.room_id[0];
           conv.ask(new Confirmation(`Your room id is: ${roomId}, Can you confirm?`));
         }
       } catch (error) {
@@ -317,23 +329,23 @@ exports.urgentHelper = functions.https.onRequest((request, response) => {
         console.error(`store line error ${error}`);
       }
 
-      agent.add(new Suggestion('Yes'));
       agent.add(conv);
     };
   };
 
   const storeLineConfirmation = (agent) => {
     const conv = agent.conv();
-    const roomId = agent.context.get('room_id').parameters.room_id[0];
-    const confirmation = agent.context.get('actions_intent_confirmation').parameters.CONFIRMATION;
+    const roomId = conv.data.roomId;
 
-    if (confirmation) {
-      conv.user.storage.roomId = roomId;
-      agent.add(`Google assistant has linked your line's room id. You can send your
+    if (conv.arguments.get('CONFIRMATION')) {
+      conv.ask(`Google assistant has linked your line's room id. You can send your
       urgent information to your contact when you need.`);
-    } else {
-      agent.add('You need say yes for using Urgent Helper.');
+      conv.user.storage.roomId = roomId;
+
+      return agent.add(conv)
     }
+
+    agent.add('You need say yes for using Urgent Helper.');
   };
 
   let intentMap = new Map();
@@ -344,7 +356,7 @@ exports.urgentHelper = functions.https.onRequest((request, response) => {
       break;
     default:
       intentMap.set('store_line', storeLine);
-      intentMap.set('store_line_confirmation', storeLineConfirmation);
+      intentMap.set('store_line - custom', storeLineConfirmation);
       intentMap.set('Default Welcome Intent', welcome);
       intentMap.set('Default Welcome Intent - next', WelcomeIntentNext);
       intentMap.set('call_help', callHelp);
