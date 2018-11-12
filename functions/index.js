@@ -27,6 +27,8 @@ const lineClient = new line.Client(lineConfig);
 
 const {
   WebhookClient,
+  Card,
+  Suggestion,
 } = require('dialogflow-fulfillment');
 
 // audio config
@@ -34,18 +36,25 @@ const sounds = {
   alarmClock: 'https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg'
 };
 
+const lineUrgentHelper = {
+  imageUrl: 'https://firebasestorage.googleapis.com/v0/b/urgent-helper.appspot.com/o/line%2Fline_qrcode.png?alt=media&token=911314bd-1e90-4426-b967-d4e6092afd3c',
+  buttonUrl: 'https://line.me/R/ti/p/%40jcx3672s',
+};
+
 /**
- * ask a user for permission
+ * Ask a user for permission
+ * @param {object} agent
  * @param {object} options
  */
 const askPermission = (agent, options) => {
-  let conv = agent.conv();
+  const conv = agent.conv();
   conv.ask(new Permission(options));
   agent.add(conv);
 };
 
 /**
- * call the audio from responses
+ * Call the audio from responses
+ * @param {object} agent
  * @param {string} textToSpeech
  */
 const askAudio = (agent, textToSpeech) => {
@@ -53,7 +62,7 @@ const askAudio = (agent, textToSpeech) => {
 };
 
 /**
- * Gets the closet places from user's coordinates.
+ * Get the closet places from user's coordinates.
  * @param {object} params
  * @return {promise}
  * @return {results<object>}
@@ -74,7 +83,7 @@ const getPlacesNearby = async (params) => {
 };
 
 /**
- * Gets the distance from origin address to destination addresses
+ * Get the distance from origin address to destination addresses
  * @param {object} params
  * @return {results<object>}
  */
@@ -94,7 +103,7 @@ const getDistanceMatrix = async (params) => {
 };
 
 /**
- * push message to line
+ * Push message to line
  * @param {string} to
  * @param {array} message
  * @param {array} location
@@ -113,14 +122,28 @@ const callContact = async ({to, message, location}) => {
   }
 };
 
+/**
+ * Check if has a roomId
+ * @param {Object} conv
+ * @return {boolean}
+ */
 const hasRoomId = (conv) => {
   return !!conv.user.storage.roomId;
 };
 
+/**
+ * Get line room id
+ * @param {Object} conv
+ * @return {string} roomId
+ */
 const getRoomId = (conv) => {
   return conv.user.storage.roomId;
 };
 
+/**
+ * Send notifications to line contacts
+ * @param {Object} agent
+ */
 const sendNotify = async (agent) => {
   const conv = agent.conv();
   const {coordinates} = conv.request.device.location;
@@ -186,33 +209,83 @@ const sendNotify = async (agent) => {
   }
 };
 
+const getGroupChatId = (source) => {
+  let id = null;
+
+  switch (source.type) {
+    case 'room':
+      id = source.roomId;
+      break;
+    case 'group':
+      id = source.groupId;
+      break;
+  }
+
+  return id;
+};
+
+const verifyChatId = (id) => {
+  let groupPattern = /C[0-9a-f]{32}/
+  let chatPattern = /R[0-9a-f]{32}/
+
+  return (id.match(groupPattern) !== null || id.match(chatPattern) !== null) || false
+};
+
 exports.urgentHelper = functions.https.onRequest((request, response) => {
   const agent = new WebhookClient({request, response});
 
+  /**
+   * Handle intent named 'line_info'
+   * @param {Object} agent
+   */
   const lineInfo = (agent) => {
-    agent.add(`Please copy below's room id to your google assistant`);
-    const id = request.body.originalDetectIntentRequest.payload.data.source.roomId;
-    agent.add(`${id}`);
+    const {source} = request.body.originalDetectIntentRequest.payload.data;
+    const chatId = getGroupChatId(source);
+    agent.add(`${chatId}`);
   };
 
+  /**
+   * Handle intent named 'default welcome intent'
+   * @param {Object} agent
+   * @return {results}
+   */
   const welcome = (agent) => {
     const conv = agent.conv();
 
     if (hasRoomId(conv)) {
-      const options = {
-        context: 'To give results in your area',
-        permissions: ['NAME', 'DEVICE_PRECISE_LOCATION'],
-      };
-      askPermission(agent, options);
-    } else {
-      agent.add(`following below's steps for setting up your chat room with google assistant`);
-      agent.add(`1. go to LINE App and call "get room id" to get your room id`);
-      agent.add(`2. call "store line" at google assistant and enter your room id`);
+      agent.add('Welcome to urgent helper, how can I help you?');
+      return agent.add(new Suggestion('help'));
     }
+
+    agent.add('Welcome to urgent helper! If you use urgent helper first time, please set up you contacts with google assistant?');
+    agent.add(new Card(responses.addLineCard({...lineUrgentHelper})));
+    agent.add(new Suggestion('go forward'));
+  };
+
+
+  /**
+   * Handle the intent named 'call_help'
+   * @param {object} agent
+   */
+  const callHelp = (agent) => {
+    const options = {
+      context: 'To give results in your area',
+      permissions: ['NAME', 'DEVICE_PRECISE_LOCATION'],
+    };
+    askPermission(agent, options);
   };
 
   /**
-   * Handle the Dialogflow intent named 'actions_intent_PERMISSION
+   * Handle intent named 'default welcome intent - next'
+   * @param {Object} agent
+   */
+  const WelcomeIntentNext = (agent) => {
+    agent.add(responses.setLineSteps);
+    agent.add(new Suggestion('store line'));
+  };
+
+  /**
+   * Handle the Dialogflow intent named 'actions_intent_PERMISSION'
    * @param {object} agent
    * @return {results}
    */
@@ -226,28 +299,53 @@ exports.urgentHelper = functions.https.onRequest((request, response) => {
     return sendNotify(agent);
   };
 
+  /**
+   * Handle the intent named 'storeLine'
+   * @param {object} agent
+   */
   const storeLine = async (agent) => {
     const conv = agent.conv();
     const roomId = agent.parameters.room_id[0];
 
     if (roomId) {
+      if (!verifyChatId(roomId)) {
+        return agent.add('Your id is invalidate, please check it again.');
+      }
+
       try {
         const response = await lineClient.pushMessage(roomId, {
           type: 'text',
-          text: 'success link to google assistant',
+          text: 'Trying to link with google assistant',
         });
 
         if (response) {
-          conv.user.storage.roomId = roomId;
+          conv.data.roomId = agent.parameters.room_id[0];
           conv.ask(new Confirmation(`Your room id is: ${roomId}, Can you confirm?`));
         }
       } catch (error) {
-        conv.close(`Please check you entered the room id from line correctly`);
+        conv.ask(`Please check you entered the correct room id from line`);
+        conv.ask(new Suggestion('store line'));
+        conv.ask(new Suggestion('cancel'));
         console.error(`store line error ${error}`);
       }
 
       agent.add(conv);
     };
+  };
+
+  const storeLineConfirmation = (agent) => {
+    const conv = agent.conv();
+    const roomId = conv.data.roomId;
+
+    if (conv.arguments.get('CONFIRMATION')) {
+      conv.ask(`Google assistant has linked your line's room id. You can send your
+      urgent information to your contact when you need.`);
+      conv.user.storage.roomId = roomId;
+
+      return agent.add(conv)
+    }
+
+    agent.add('You need say yes for using Urgent Helper.');
   };
 
   let intentMap = new Map();
@@ -257,10 +355,13 @@ exports.urgentHelper = functions.https.onRequest((request, response) => {
       intentMap.set('line_info', lineInfo);
       break;
     default:
-      intentMap.set('Default Welcome Intent', welcome);
-      intentMap.set('actions_intent_PERMISSION', actionsIntentPermission);
       intentMap.set('store_line', storeLine);
-      break;
+      intentMap.set('store_line - custom', storeLineConfirmation);
+      intentMap.set('Default Welcome Intent', welcome);
+      intentMap.set('Default Welcome Intent - next', WelcomeIntentNext);
+      intentMap.set('call_help', callHelp);
+      intentMap.set('actions_intent_PERMISSION', actionsIntentPermission);
+    break;
   }
 
   agent.handleRequest(intentMap);
