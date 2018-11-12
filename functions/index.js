@@ -300,7 +300,7 @@ exports.urgentHelper = functions.https.onRequest((request, response) => {
   };
 
   /**
-   * Handle the intent named 'storeLine'
+   * Handle the intent named 'store_line'
    * @param {object} agent
    */
   const storeLine = async (agent) => {
@@ -333,6 +333,10 @@ exports.urgentHelper = functions.https.onRequest((request, response) => {
     };
   };
 
+  /**
+   * Handle the intent named 'store_line - custom'
+   * @param {object} agent
+   */
   const storeLineConfirmation = (agent) => {
     const conv = agent.conv();
     const roomId = conv.data.roomId;
