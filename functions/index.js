@@ -348,6 +348,32 @@ exports.urgentHelper = functions.https.onRequest((request, response) => {
     agent.add('You need say yes for using Urgent Helper.');
   };
 
+  /**
+   * Handle the intent named 'delete_all_data'
+   * @param {object} agent
+   */
+  const deleteAllData = (agent) => {
+    const conv = agent.conv();
+    conv.ask(new Confirmation(`Are you sure you want to delete all of the data? Can you confirm?`));
+    return agent.add(conv)
+  };
+
+  /**
+   * Handle the intent named 'delete_all_data - confirmation'
+   * @param {object} agent
+   */
+  const deleteAllDataConfirmation = (agent) => {
+    const conv = agent.conv();
+
+    if (conv.arguments.get('CONFIRMATION')) {
+      conv.user.storage = {};
+      conv.ask(`We've deleted all of your data in Urgent Helper.`);
+      return agent.add(conv)
+    }
+
+    agent.add('You need say yes for deleting your data.');
+  };
+
   let intentMap = new Map();
 
   switch (agent.requestSource) {
@@ -361,6 +387,8 @@ exports.urgentHelper = functions.https.onRequest((request, response) => {
       intentMap.set('Default Welcome Intent - next', WelcomeIntentNext);
       intentMap.set('call_help', callHelp);
       intentMap.set('actions_intent_PERMISSION', actionsIntentPermission);
+      intentMap.set('delete_all_data', deleteAllData);
+      intentMap.set('delete_all_data - custom', deleteAllDataConfirmation);
     break;
   }
 
