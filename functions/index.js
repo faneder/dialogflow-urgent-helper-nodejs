@@ -3,6 +3,7 @@
 const {
   Permission,
   Confirmation,
+  Suggestions,
 } = require('actions-on-google');
 const {
   responses,
@@ -283,7 +284,6 @@ exports.urgentHelper = functions.https.onRequest((request, response) => {
     const conv = agent.conv();
 
     if (!hasRoomId(conv)) {
-      console.log('call help')
       return linkLine(agent);
     }
 
@@ -291,6 +291,7 @@ exports.urgentHelper = functions.https.onRequest((request, response) => {
       context: 'To give results in your area',
       permissions: ['NAME', 'DEVICE_PRECISE_LOCATION'],
     };
+
     askPermission(agent, options);
   };
 
@@ -314,7 +315,6 @@ exports.urgentHelper = functions.https.onRequest((request, response) => {
    * @param {object} agent
    */
   const storeLine = async (agent) => {
-    const conv = agent.conv();
     const roomId = agent.parameters.room_id[0];
 
     if (roomId) {
@@ -329,17 +329,16 @@ exports.urgentHelper = functions.https.onRequest((request, response) => {
         });
 
         if (response) {
+          const conv = agent.conv();
           conv.data.roomId = agent.parameters.room_id[0];
           conv.ask(new Confirmation(`Your room id is: ${roomId}, Can you confirm?`));
+          agent.add(conv);
         }
       } catch (error) {
-        conv.ask(`Please check you entered the correct room id from line`);
-        conv.ask(new Suggestion('Store line'));
-        conv.ask(new Suggestion('Cancel'));
+        agent.add('Please check you entered the correct room id from line');
+        agent.add(new Suggestion('Store line'));
         console.error(`store line error ${error}`);
       }
-
-      agent.add(conv);
     };
   };
 
@@ -355,10 +354,8 @@ exports.urgentHelper = functions.https.onRequest((request, response) => {
       conv.user.storage.roomId = roomId;
       conv.ask(`Google assistant has linked your line's room id. You can send your
       urgent information to your contact when you need.`);
-      conv.ask(new Suggestion('Call contact'));
-      conv.ask(new Suggestion('Cancel'));
-
-      return agent.add(conv)
+      conv.ask(new Suggestions(['Call contact', 'Cancel']));
+      agent.add(conv);
     }
 
     agent.add('You need say yes for using Urgent Helper.');
@@ -371,7 +368,7 @@ exports.urgentHelper = functions.https.onRequest((request, response) => {
   const deleteAllData = (agent) => {
     const conv = agent.conv();
     conv.ask(new Confirmation(`Are you sure you want to delete all of the data? Can you confirm?`));
-    return agent.add(conv)
+    agent.add(conv);
   };
 
   /**
@@ -384,7 +381,7 @@ exports.urgentHelper = functions.https.onRequest((request, response) => {
     if (conv.arguments.get('CONFIRMATION')) {
       conv.user.storage = {};
       conv.close(`We've deleted all of your data in Urgent Helper.`);
-      return agent.add(conv)
+      return agent.add(conv);
     }
 
     agent.add('If you want to delete data, you need say yes for deleting them.');
