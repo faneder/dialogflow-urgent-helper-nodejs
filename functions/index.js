@@ -371,7 +371,7 @@ exports.urgentHelper = functions.https.onRequest((request, response) => {
 
     if (conv.arguments.get('CONFIRMATION')) {
       conv.user.storage = {};
-      conv.ask(`We've deleted all of your data in Urgent Helper.`);
+      conv.close(`We've deleted all of your data in Urgent Helper.`);
       return agent.add(conv)
     }
 

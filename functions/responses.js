@@ -11,7 +11,7 @@ const responses = {
         <audio src="${alarmClock}">emergency alarm</audio>
         <emphasis level="strong">
             Hi ${userName}, you are being helped.
-            I've sent your information to your contacts.
+            We've sent your information to your contacts.
             They will be helping you soon. Your location is at "${userAddress}",
             the closest hospital "${hospitalName}" is at ${hospitalAddress}
             where is ${durationTraffic} away to yours location.
