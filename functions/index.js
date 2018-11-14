@@ -319,7 +319,8 @@ exports.urgentHelper = functions.https.onRequest((request, response) => {
 
     if (roomId) {
       if (!verifyChatId(roomId)) {
-        return agent.add('Your id is invalidate, please check it again.');
+        agent.add('Your id is invalidate, please try it again.');
+        return agent.add(new Suggestion('Store line'));
       }
 
       try {
