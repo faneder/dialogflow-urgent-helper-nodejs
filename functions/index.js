@@ -61,6 +61,21 @@ const askAudio = (agent, textToSpeech) => {
   agent.add(textToSpeech);
 };
 
+const linkLine = (agent) => {
+  agent.add('Welcome to urgent helper! If you use urgent helper the first time, please set up your contacts with Google Assistant.');
+  agent.add(new Card(responses.addLineCard({...lineUrgentHelper})));
+  agent.add(new Suggestion('Go forward'));
+}
+
+/**
+ * Handle intent named 'default welcome intent - next' and 'call_help - next'
+ * @param {Object} agent
+ */
+const setLineSteps = (agent) => {
+  agent.add(responses.setLineSteps);
+  agent.add(new Suggestion('Store line'));
+};
+
 /**
  * Get the closet places from user's coordinates.
  * @param {object} params
@@ -254,34 +269,29 @@ exports.urgentHelper = functions.https.onRequest((request, response) => {
 
     if (hasRoomId(conv)) {
       agent.add('Welcome to urgent helper, how can I help you?');
-      return agent.add(new Suggestion('help'));
+      return agent.add(new Suggestion('Help'));
     }
 
-    agent.add('Welcome to urgent helper! If you use urgent helper first time, please set up you contacts with google assistant?');
-    agent.add(new Card(responses.addLineCard({...lineUrgentHelper})));
-    agent.add(new Suggestion('go forward'));
-  };
-
+    return linkLine(agent);
+ };
 
   /**
    * Handle the intent named 'call_help'
    * @param {object} agent
    */
   const callHelp = (agent) => {
+    const conv = agent.conv();
+
+    if (!hasRoomId(conv)) {
+      console.log('call help')
+      return linkLine(agent);
+    }
+
     const options = {
       context: 'To give results in your area',
       permissions: ['NAME', 'DEVICE_PRECISE_LOCATION'],
     };
     askPermission(agent, options);
-  };
-
-  /**
-   * Handle intent named 'default welcome intent - next'
-   * @param {Object} agent
-   */
-  const WelcomeIntentNext = (agent) => {
-    agent.add(responses.setLineSteps);
-    agent.add(new Suggestion('store line'));
   };
 
   /**
@@ -324,8 +334,8 @@ exports.urgentHelper = functions.https.onRequest((request, response) => {
         }
       } catch (error) {
         conv.ask(`Please check you entered the correct room id from line`);
-        conv.ask(new Suggestion('store line'));
-        conv.ask(new Suggestion('cancel'));
+        conv.ask(new Suggestion('Store line'));
+        conv.ask(new Suggestion('Cancel'));
         console.error(`store line error ${error}`);
       }
 
@@ -342,9 +352,11 @@ exports.urgentHelper = functions.https.onRequest((request, response) => {
     const roomId = conv.data.roomId;
 
     if (conv.arguments.get('CONFIRMATION')) {
+      conv.user.storage.roomId = roomId;
       conv.ask(`Google assistant has linked your line's room id. You can send your
       urgent information to your contact when you need.`);
-      conv.user.storage.roomId = roomId;
+      conv.ask(new Suggestion('Call contact'));
+      conv.ask(new Suggestion('Cancel'));
 
       return agent.add(conv)
     }
@@ -375,7 +387,7 @@ exports.urgentHelper = functions.https.onRequest((request, response) => {
       return agent.add(conv)
     }
 
-    agent.add('You need say yes for deleting your data.');
+    agent.add('If you want to delete data, you need say yes for deleting them.');
   };
 
   let intentMap = new Map();
@@ -388,8 +400,9 @@ exports.urgentHelper = functions.https.onRequest((request, response) => {
       intentMap.set('store_line', storeLine);
       intentMap.set('store_line - custom', storeLineConfirmation);
       intentMap.set('Default Welcome Intent', welcome);
-      intentMap.set('Default Welcome Intent - next', WelcomeIntentNext);
+      intentMap.set('Default Welcome Intent - next', setLineSteps);
       intentMap.set('call_help', callHelp);
+      intentMap.set('call_help - next', setLineSteps);
       intentMap.set('actions_intent_PERMISSION', actionsIntentPermission);
       intentMap.set('delete_all_data', deleteAllData);
       intentMap.set('delete_all_data - custom', deleteAllDataConfirmation);
