@@ -356,7 +356,7 @@ exports.urgentHelper = functions.https.onRequest((request, response) => {
       conv.ask(`Google assistant has linked your line's room id. You can send your
       urgent information to your contact when you need.`);
       conv.ask(new Suggestions(['Call contact', 'Cancel']));
-      agent.add(conv);
+      return agent.add(conv);
     }
 
     agent.add('You need say yes for using Urgent Helper.');
