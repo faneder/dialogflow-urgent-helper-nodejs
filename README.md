@@ -6,8 +6,12 @@ This built using Dialogflow and Node.js, this sample introduces asking for more 
 
 ## Google Maps API
 
-[Distance Matrix Service](https://developers.google.com/maps/documentation/distance-matrix/intro)
-[Google Places API](https://developers.google.com/places/web-service/intro)
+- [Distance Matrix Service](https://developers.google.com/maps/documentation/distance-matrix/intro)
+- [Google Places API](https://developers.google.com/places/web-service/intro)
+
+## Line Messaging API
+
+- [Line Messaging API](https://developers.line.biz/en/docs/messaging-api/overview)
 
 ## Setup Instructions
 
@@ -37,7 +41,7 @@ Click on the **Add to Dialogflow** button below and follow the prompts to create
 1. Open [Dialogflow's *Integrations* page]((https://console.dialogflow.com/api-client/#/agent//integrations)), from the left navigation menu and open the *Integration Settings* menu for Actions on Google.
 1. Enable *Auto-preview changes* and Click *Test*. This will open the Actions on Google simulator.
 1. Click *View* to open the Actions on Google simulator.
-1. Type `Talk to talk to dear urgent helper` in the simulator, or say `OK Google, talk to dear urgent helper` to any Actions on Google enabled device signed into your developer account.
+1. Type `Talk to Urgent Helper` in the simulator, or say `OK Google, talk to Urgent Helper` to any Actions on Google enabled device signed into your developer account.
 
 For more detailed information on deployment, see the [documentation](https://developers.google.com/actions/dialogflow/deploy-fulfillment).
 
