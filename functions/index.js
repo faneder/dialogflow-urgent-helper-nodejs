@@ -340,7 +340,9 @@ exports.urgentHelper = functions.https.onRequest((request, response) => {
         agent.add(new Suggestion('Store line'));
         console.error(`store line error ${error}`);
       }
-    };
+    } else {
+      agent.add('Please enter your Line id');
+    }
   };
 
   /**
